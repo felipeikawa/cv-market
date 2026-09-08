@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="intro"><h1>Importar NF-e</h1><p>Selecione o arquivo XML da NF-e para ler e registrar seus produtos.</p></section>
+<section class="panel upload-panel">
+  <form method="post" enctype="multipart/form-data">
+    <div class="upload-icon">↑</div>
+    <h2>Selecione o arquivo XML da NF-e</h2>
+    <p id="fileName">O arquivo será validado antes da importação.</p>
+    <input type="file" id="xml" name="xml" accept=".xml,application/xml" required>
+    <label class="button secondary" for="xml">Selecionar XML</label>
+    <button class="button primary" type="submit">Importar NF-e</button>
+  </form>
+</section>
+{% if nota %}
+<section class="panel nfe-summary">
+  <h2>NF-e importada</h2>
+  <div class="summary-grid">
+    <div><small>Fornecedor</small><strong>{{ nota.nome_emitente }}</strong></div>
+    <div><small>CNPJ</small><strong>{{ nota.cnpj_emitente }}</strong></div>
+    <div><small>Número da NF-e</small><strong>{{ nota.numero }}</strong></div>
+    <div><small>Data de emissão</small><strong>{{ nota.data_emissao.strftime('%d/%m/%Y') }}</strong></div>
+    <div><small>Quantidade de itens</small><strong>{{ nota.itens|length }}</strong></div>
+  </div>
+</section>
+<section class="panel table-panel">
+  <div class="panel-heading"><h2>Produtos da NF-e</h2></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Produto</th><th>EAN</th><th>Quantidade</th><th>Unidade</th><th>Valor unitário</th><th>Valor total</th><th>Lote</th><th>Validade</th></tr></thead>
+    <tbody>{% for item in nota.itens %}<tr>
+      <td>{{ item.descricao }}</td><td>{{ item.ean or 'Não informado' }}</td><td>{{ item.quantidade }}</td><td>{{ item.unidade or 'Não informado' }}</td>
+      <td>R$ {{ '%.2f'|format(item.valor_unitario) }}</td><td>R$ {{ '%.2f'|format(item.valor_total) }}</td>
+      <td>{{ item.lote or 'Não informado' }}</td><td>{{ item.data_validade.strftime('%d/%m/%Y') if item.data_validade else 'Não informado' }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
+<script>document.getElementById('xml').addEventListener('change', function () { document.getElementById('fileName').textContent = this.files[0] ? this.files[0].name : 'O arquivo será validado antes da importação.'; });</script>
+{% endblock %}

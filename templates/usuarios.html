@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="page-heading">
+  <div><h1>Usuários</h1><p>Gerencie os acessos ao C&V MARKET.</p></div>
+  <a class="button primary" href="{{ url_for('usuarios', novo=1) }}">+ Novo usuário</a>
+</section>
+
+{% if novo %}
+<section class="panel form-panel">
+  <h2>Novo usuário</h2>
+  <form method="post">
+    <label for="nome">Nome</label>
+    <input id="nome" name="nome" value="{{ formulario.nome }}" required autofocus>
+
+    <label for="email">E-mail</label>
+    <input id="email" name="email" type="email" value="{{ formulario.email }}" required>
+
+    <label for="senha">Senha</label>
+    <input id="senha" name="senha" type="password" minlength="8" required>
+
+    <div class="form-grid">
+      <div>
+        <label for="perfil">Perfil/Tipo de usuário</label>
+        <select id="perfil" name="perfil">
+          <option value="operador" {{ 'selected' if formulario.perfil == 'operador' }}>Operador</option>
+          <option value="admin" {{ 'selected' if formulario.perfil == 'admin' }}>Administrador</option>
+        </select>
+      </div>
+      <div>
+        <label for="ativo">Status</label>
+        <label><input id="ativo" name="ativo" type="checkbox" {{ 'checked' if formulario.ativo }}> Ativo</label>
+      </div>
+    </div>
+    <button class="button primary" type="submit">Salvar usuário</button>
+    <a class="button secondary" href="{{ url_for('usuarios') }}">Cancelar</a>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>{% for usuario in usuarios %}<tr><td>{{ usuario.nome }}</td><td>{{ usuario.email }}</td><td><span class="badge neutral">{{ usuario.perfil|capitalize }}</span></td><td><span class="badge ok">{{ 'Ativo' if usuario.ativo else 'Inativo' }}</span></td><td><button class="link-button">Editar</button><button class="link-button">{{ 'Desativar' if usuario.ativo else 'Ativar' }}</button></td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

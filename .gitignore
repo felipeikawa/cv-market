@@ -1,0 +1,32 @@
+# Ambientes e cache Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Banco e arquivos locais
+database/*.db
+database/*.sqlite*
+uploads/
+
+# Documentos locais de NF-e (podem conter dados pessoais/comerciais)
+Arquivos/
+
+# Configurações locais, credenciais e segredos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+
+# Arquivos temporários e do sistema
+*.tmp
+*.temp
+*.log
+.DS_Store
