@@ -5,25 +5,45 @@ from pathlib import Path
 from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 import xml.etree.ElementTree as ET
+import click
 
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, render_template, request, send_from_directory, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.engine import make_url
 from werkzeug.utils import secure_filename
 
 from models import Conferencia, ItemConferencia, ItemNFe, NFe, Usuario, db
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+
+
+def ambiente_producao():
+    return os.getenv("RENDER", "").lower() == "true" or os.getenv("APP_ENV", "").lower() == "production"
+
+
+if not ambiente_producao():
+    load_dotenv(dotenv_path=BASE_DIR / ".env", override=False)
+PRODUCTION = ambiente_producao()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 
 def uri_banco_de_dados():
     """Normaliza URLs PostgreSQL comuns para o driver psycopg instalado."""
     if not DATABASE_URL:
+        if PRODUCTION:
+            raise RuntimeError("DATABASE_URL é obrigatória em produção; SQLite não é permitido.")
         return f"sqlite:///{BASE_DIR / 'database' / 'cv_market.db'}"
+    if PRODUCTION:
+        try:
+            url = make_url(DATABASE_URL)
+            valido = url.drivername in ("postgres", "postgresql", "postgresql+psycopg") and url.host and url.database
+        except Exception:
+            valido = False
+        if not valido:
+            raise RuntimeError("DATABASE_URL deve definir uma conexão PostgreSQL válida em produção.")
     if DATABASE_URL.startswith("postgres://"):
         return f"postgresql+psycopg://{DATABASE_URL.removeprefix('postgres://')}"
     if DATABASE_URL.startswith("postgresql://"):
@@ -32,12 +52,7 @@ def uri_banco_de_dados():
 
 
 def caminho_armazenamento_xml():
-    """Retorna o diretório configurável dos XMLs originais.
-
-    Sem configuração, preserva o comportamento local atual. Em produção, o
-    diretório deve apontar para um armazenamento persistente quando ele estiver
-    disponível.
-    """
+    """Diretório de XMLs do desenvolvimento; arquivamento desativado em produção."""
     diretorio_configurado = os.getenv("XML_STORAGE_DIR")
     return Path(diretorio_configurado) if diretorio_configurado else BASE_DIR / "uploads" / "nfes"
 
@@ -52,8 +67,20 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = configurar_secret_key()
 app.config["SQLALCHEMY_DATABASE_URI"] = uri_banco_de_dados()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"hide_parameters": True, "pool_pre_ping": True}
+app.config["DEBUG"] = False
+app.config["SESSION_COOKIE_SECURE"] = PRODUCTION
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 app.config["XML_STORAGE_DIR"] = caminho_armazenamento_xml()
+app.config["XML_ARCHIVE_ENABLED"] = not PRODUCTION
+
+if PRODUCTION:
+    # Tracebacks de drivers podem incluir credenciais e parâmetros de consultas.
+    def registrar_erro_sanitizado(exc_info):
+        app.logger.error("Erro interno da aplicação (%s).", exc_info[0].__name__)
+    app.log_exception = registrar_erro_sanitizado
 
 STATUS_NFE = ("Importada", "Em conferência", "Conferida", "Com divergência")
 
@@ -82,21 +109,41 @@ def somente_admin(view):
 def criar_estrutura_inicial():
     if not DATABASE_URL:
         (BASE_DIR / "database").mkdir(exist_ok=True)
-    app.config["XML_STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
+    if app.config["XML_ARCHIVE_ENABLED"]:
+        app.config["XML_STORAGE_DIR"].mkdir(parents=True, exist_ok=True)
     db.create_all()
     migrar_banco_existente()
+    criar_admin_inicial()
 
+
+def criar_admin_inicial():
+    """Não modifica contas existentes, mesmo quando não há administrador."""
     if Usuario.query.first():
-        return
+        return False
 
     nome = os.getenv("BOOTSTRAP_ADMIN_NAME")
     email = os.getenv("BOOTSTRAP_ADMIN_EMAIL")
     senha = os.getenv("BOOTSTRAP_ADMIN_PASSWORD")
-    if all((nome, email, senha)):
+    if all((nome and nome.strip(), email and email.strip(), senha)):
+        if len(senha) < 8 or "@" not in email:
+            raise ValueError("Bootstrap exige e-mail válido e senha com pelo menos 8 caracteres.")
         admin = Usuario(nome=nome.strip(), email=email.strip().lower(), perfil="admin")
         admin.definir_senha(senha)
         db.session.add(admin)
         db.session.commit()
+        return True
+    return False
+
+
+@app.cli.command("bootstrap-admin")
+def bootstrap_admin():
+    """Cria o primeiro administrador somente em uma base sem usuários."""
+    try:
+        criado = criar_admin_inicial()
+    except Exception:
+        db.session.rollback()
+        raise click.ClickException("Bootstrap não concluído. Verifique as variáveis e a disponibilidade das tabelas.") from None
+    click.echo("Administrador inicial criado." if criado else "Nenhum usuário alterado: base já possui usuários ou bootstrap não configurado.")
 
 
 def migrar_banco_existente():
@@ -226,6 +273,11 @@ def inicio():
     return redirect(url_for("dashboard" if current_user.is_authenticated else "login"))
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}, 200
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
@@ -283,9 +335,11 @@ def importar():
                 flash("Esta NF-e já foi importada.", "error")
                 return redirect(url_for("importar"))
 
-            nome_interno = f"{uuid4().hex}.xml"
-            caminho_xml = app.config["XML_STORAGE_DIR"] / nome_interno
-            caminho_xml.write_bytes(conteudo_xml)
+            nome_interno = None
+            if app.config["XML_ARCHIVE_ENABLED"]:
+                nome_interno = f"{uuid4().hex}.xml"
+                caminho_xml = app.config["XML_STORAGE_DIR"] / nome_interno
+                caminho_xml.write_bytes(conteudo_xml)
             nota = NFe(
                 chave_acesso=dados["chave_acesso"], numero=dados["numero"], data_emissao=dados["data_emissao"],
                 cnpj_emitente=dados["cnpj_emitente"], nome_emitente=dados["nome_emitente"],
@@ -464,6 +518,9 @@ def nfes_recebidas():
 @somente_admin
 def xml_original_nfe(nfe_id):
     nota = db.get_or_404(NFe, nfe_id)
+    if not app.config["XML_ARCHIVE_ENABLED"]:
+        flash("Consulta do XML original indisponível até a configuração de armazenamento persistente.", "info")
+        return redirect(url_for("detalhe_nfe", nfe_id=nota.id))
     if not nota.xml_original_path:
         flash("O XML original não foi armazenado para esta NF-e importada anteriormente.", "info")
         return redirect(url_for("detalhe_nfe", nfe_id=nota.id))
@@ -558,9 +615,12 @@ def acesso_negado(_erro):
     return render_template("erro.html", titulo="Acesso restrito", mensagem="Você não possui permissão para acessar esta página."), 403
 
 
-with app.app_context():
-    criar_estrutura_inicial()
+if not PRODUCTION:
+    with app.app_context():
+        criar_estrutura_inicial()
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0" if PRODUCTION else "127.0.0.1",
+            port=int(os.getenv("PORT", "5000")),
+            debug=not PRODUCTION and os.getenv("FLASK_DEBUG", "0") == "1")

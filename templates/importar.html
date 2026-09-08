@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="intro"><h1>Importar NF-e</h1><p>Selecione o arquivo XML da NF-e para ler e registrar seus produtos.</p></section>
+{% if not config.XML_ARCHIVE_ENABLED %}<div class="alert info">Os dados da NF-e serão registrados, mas o XML original não será armazenado. Guarde uma cópia: o download do XML ficará indisponível até conectarmos armazenamento persistente.</div>{% endif %}
 <section class="panel upload-panel">
   <form method="post" enctype="multipart/form-data">
     <div class="upload-icon">↑</div>

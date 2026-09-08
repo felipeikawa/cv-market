@@ -11,6 +11,13 @@ __pycache__/
 # Banco e arquivos locais
 database/*.db
 database/*.sqlite*
+*.db
+*.db-*
+*.sqlite*
+*.xml
+*.XML
+*.pdf
+*.PDF
 uploads/
 
 # Documentos locais de NF-e (podem conter dados pessoais/comerciais)
