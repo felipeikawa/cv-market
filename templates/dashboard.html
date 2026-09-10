@@ -1,1 +1,12 @@
-{% extends 'base.html' %}{% block content %}<section class="intro"><h1>Visão geral</h1><p>Acompanhe o recebimento de mercadorias em um só lugar.</p></section><section class="cards">{% for rotulo, valor, icone in [('NF-e recebidas', total_nfes, '▤'), ('Conferências pendentes', conferencias_pendentes, '◷'), ('Produtos conferidos', produtos_conferidos, '✓'), ('Alertas de validade', '0', '!')] %}<article class="stat-card"><span class="stat-icon">{{ icone }}</span><div><small>{{ rotulo }}</small><strong>{{ valor }}</strong></div></article>{% endfor %}</section><section class="panel"><h2>Próximos passos</h2><p>As NF-e importadas podem ser consultadas em NF-e Recebidas e estarão prontas para conferência.</p></section>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<section class="intro"><h1>Visão geral</h1><p>Acompanhe o recebimento de mercadorias em um só lugar.</p></section>
+<section class="cards">
+{% for rotulo, valor, icone, destino in [('NF-e recebidas', total_nfes, '▤', 'nfes_recebidas'), ('Conferências pendentes', conferencias_pendentes, '◷', 'conferencia'), ('Produtos conferidos', produtos_conferidos, '✓', none), ('Alertas de validade', '0', '!', none)] %}
+{% if destino %}<a class="stat-card stat-card-link" href="{{ url_for(destino) }}">{% else %}<article class="stat-card">{% endif %}
+<span class="stat-icon" aria-hidden="true">{{ icone }}</span><div><small>{{ rotulo }}</small><strong>{{ valor }}</strong></div>
+{% if destino %}</a>{% else %}</article>{% endif %}
+{% endfor %}
+</section>
+<section class="panel"><h2>Próximos passos</h2><p>As NF-e importadas podem ser consultadas em NF-e Recebidas e estarão prontas para conferência.</p></section>
+{% endblock %}

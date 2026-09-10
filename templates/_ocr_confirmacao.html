@@ -1,0 +1,25 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ocr_conferencia.css') }}">
+<dialog id="ocrDialog" aria-labelledby="ocrHeading">
+  <h2 id="ocrHeading">Ler lote e validade</h2>
+  <p>A imagem é processada no seu dispositivo e não é salva no sistema.</p>
+  <p>Escolha uma imagem ou tire uma foto, conforme as opções do navegador. Use boa luz e foco. Até 20 MB. A primeira leitura precisa de internet para carregar o OCR.</p>
+  <input id="conferenceOCRImage" type="file" accept="image/*" hidden>
+  <div id="conferenceOCRProgress" role="status" aria-live="polite" hidden><p id="conferenceOCRStatus"></p><progress id="conferenceOCRPercent" max="100" aria-label="Progresso do OCR"></progress></div>
+  <p id="conferenceOCRError" role="alert" class="alert error" hidden></p>
+  <form id="ocrConfirmForm" hidden>
+    <h3>Dados identificados</h3>
+    <p id="ocrDateHelp"></p>
+    <label for="ocrLotChoice">Lotes encontrados</label><select id="ocrLotChoice"></select>
+    <label for="ocrLot">Lote — pode editar</label><input id="ocrLot" maxlength="100" autocomplete="off">
+    <label><input id="ocrNoLot" type="checkbox"> Não identificado</label>
+    <div id="ocrDateFields"></div>
+    <label id="ocrOrderWarning" hidden><input type="checkbox" id="ocrAcceptOrder"> Fabricação posterior à validade. Confirmo que revisei essas datas e desejo mantê-las.</label>
+    <details><summary>Ver texto identificado</summary><pre id="conferenceOCRRaw"></pre></details>
+    <div class="ocr-buttons"><button type="submit" class="button primary">Confirmar</button><button type="button" id="ocrCorrect" class="button secondary">Corrigir</button></div>
+    <p>Confirmar preenche o item na tela. Use “Salvar e próximo” para salvar.</p>
+  </form>
+  <div class="ocr-buttons"><button type="button" id="ocrChoose" class="button secondary">Selecionar ou tirar foto</button><button type="button" id="ocrClose" class="button secondary">Cancelar</button></div>
+</dialog>
+<script src="{{ url_for('static', filename='js/ocr_engine.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/ocr_parser.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/ocr_conferencia.js') }}" defer></script>

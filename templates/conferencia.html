@@ -1,5 +1,19 @@
 {% extends 'base.html' %}
 {% block content %}
 <section class="page-heading"><div><h1>Conferências</h1><p>Acompanhe os recebimentos em andamento e finalizados.</p></div><a class="button primary" href="{{ url_for('nfes_recebidas') }}">NF-e Recebidas</a></section>
-<section class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>NF-e</th><th>Fornecedor</th><th>Responsável</th><th>Início</th><th>Status</th><th>Ação</th></tr></thead><tbody>{% for conf in conferencias %}<tr><td>{{ conf.nfe.numero }}</td><td>{{ conf.nfe.nome_emitente }}</td><td>{{ conf.usuario.nome }}</td><td>{{ conf.data_inicio.strftime('%d/%m/%Y %H:%M') }}</td><td><span class="badge neutral">{{ conf.status }}</span></td><td><a class="link-button" href="{{ url_for('ver_conferencia', conferencia_id=conf.id) }}">{{ 'Continuar' if conf.status == 'Em andamento' else 'Visualizar' }}</a></td></tr>{% else %}<tr><td colspan="6" class="empty-table">Nenhuma conferência iniciada.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="panel table-panel conference-list-desktop"><div class="table-wrap"><table><thead><tr><th>NF-e</th><th>Fornecedor</th><th>Responsável</th><th>Início</th><th>Status</th><th>Ação</th></tr></thead><tbody>{% for conf in conferencias %}<tr><td>{{ conf.nfe.numero }}</td><td>{{ conf.nfe.nome_emitente }}</td><td>{{ conf.usuario.nome }}</td><td>{{ conf.data_inicio.strftime('%d/%m/%Y %H:%M') if conf.data_inicio else '—' }}</td><td><span class="badge neutral">{{ conf.status }}</span></td><td><a class="link-button" href="{{ url_for('ver_conferencia', conferencia_id=conf.id) }}">{{ 'Continuar' if conf.status == 'Em andamento' else 'Visualizar' }}</a></td></tr>{% else %}<tr><td colspan="6" class="empty-table">Nenhuma conferência iniciada.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="conference-list-mobile" aria-label="Lista de conferências">
+{% for conf in conferencias %}
+<article class="panel conference-list-card">
+<h2>NF-e {{ conf.nfe.numero }}</h2>
+<p class="conference-supplier">{{ conf.nfe.nome_emitente }}</p>
+<dl>
+<div><dt>Responsável</dt><dd>{{ conf.usuario.nome }}</dd></div>
+{% if conf.data_inicio %}<div><dt>Início</dt><dd>{{ conf.data_inicio.strftime('%d/%m/%Y %H:%M') }}</dd></div>{% endif %}
+<div><dt>Status</dt><dd><span class="badge neutral">{{ conf.status }}</span></dd></div>
+</dl>
+<a class="button {{ 'primary' if conf.status == 'Em andamento' else 'secondary' }}" href="{{ url_for('ver_conferencia', conferencia_id=conf.id) }}">{{ 'Continuar conferência' if conf.status == 'Em andamento' else 'Ver conferência' }}</a>
+</article>
+{% else %}<p class="panel">Nenhuma conferência iniciada.</p>{% endfor %}
+</section>
 {% endblock %}

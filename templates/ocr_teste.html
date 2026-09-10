@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ocr_teste.css') }}">
+<section class="ocr-test panel" aria-labelledby="ocrTitle">
+  <span class="badge neutral">Experimental</span>
+  <h1 id="ocrTitle">Teste OCR</h1>
+  <p>Selecione uma foto de embalagem para testar a leitura em português. Este teste mostra somente o texto bruto, sem interpretar ou preencher dados da conferência.</p>
+  <p class="alert info">A imagem é processada diretamente no seu dispositivo para este teste e não é salva no sistema.</p>
+  <p id="imageHelp">Até 20 MB por imagem. JPEG, PNG, WebP e outros formatos que seu navegador consiga abrir. Fotos grandes são reduzidas proporcionalmente para até 2.560 pixels no maior lado.</p>
+  <p>A primeira leitura precisa de internet para baixar o Tesseract.js e o idioma. Isso pode levar alguns instantes. Fotografe de perto, com boa luz e foco no texto.</p>
+  <input id="ocrImage" type="file" accept="image/*" aria-label="Selecionar imagem para OCR" aria-describedby="imageHelp" hidden>
+  <button id="chooseImage" class="button secondary" type="button">Selecionar ou tirar foto</button>
+  <div id="imageArea" hidden>
+    <img id="imagePreview" alt="Prévia da imagem selecionada">
+    <p id="imageInfo"></p>
+    <button id="readImage" class="button primary" type="button" disabled>Ler texto</button>
+  </div>
+  <div id="ocrProgress" role="status" aria-live="polite" hidden>
+    <p id="ocrStatus"></p>
+    <progress id="ocrPercent" max="100" aria-label="Progresso da etapa de OCR"></progress>
+  </div>
+  <p id="ocrError" class="alert error" role="alert" hidden></p>
+  <div id="ocrResult" hidden>
+    <label for="rawText">TEXTO IDENTIFICADO</label>
+    <textarea id="rawText" readonly spellcheck="false" wrap="soft" rows="12"></textarea>
+    <p id="resultHelp">Texto bruto do OCR. Selecione o conteúdo para copiar.</p>
+  </div>
+  <noscript><p>Ative o JavaScript no navegador para usar este teste.</p></noscript>
+</section>
+<script src="{{ url_for('static', filename='js/ocr_engine.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/ocr_teste.js') }}" defer></script>
+{% endblock %}

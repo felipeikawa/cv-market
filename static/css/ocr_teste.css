@@ -1,0 +1,9 @@
+.ocr-test { max-width:900px; min-width:0; overflow-wrap:anywhere; }
+.ocr-test h1 { margin-top:12px; }
+.ocr-test .button { min-height:48px; margin:0 0 16px; max-width:100%; white-space:normal; }
+.ocr-test img { display:block; width:100%; max-height:460px; object-fit:contain; margin:8px 0 12px; border-radius:8px; background:var(--light); }
+.ocr-test textarea { display:block; width:100%; max-width:100%; min-width:0; resize:vertical; padding:12px; border:1px solid #cbd5e0; border-radius:6px; font:16px/1.5 monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+.ocr-test progress { width:100%; margin-bottom:16px; }
+.ocr-test #ocrStatus { margin-bottom:8px; }
+.ocr-test #resultHelp,.ocr-test #imageInfo { font-size:14px; margin-top:8px; }
+@media (max-width:600px) { .ocr-test .button { width:100%; } }

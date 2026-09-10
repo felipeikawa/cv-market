@@ -301,6 +301,12 @@ def sair():
     return redirect(url_for("login"))
 
 
+@app.get("/ocr-teste")
+@login_required
+def ocr_teste():
+    return render_template("ocr_teste.html", titulo="Teste OCR")
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():

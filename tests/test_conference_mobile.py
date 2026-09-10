@@ -116,7 +116,7 @@ with sync_playwright() as p:
                 for selector in ['#previousItem', '#saveNext', '#allItemsButton']:
                     assert page.locator(selector).bounding_box()['height'] >= 44
                 assert page.locator('#saveNext').bounding_box()['width'] > page.locator('#previousItem').bounding_box()['width']
-                expect(page.locator('.conference-item:visible .camera-placeholder')).to_be_disabled()
+                expect(page.locator('.conference-item:visible .ocr-camera')).to_be_enabled()
                 page.locator('#quantidade_1').fill('2')
                 page.locator('#lote_1').fill('MOBILE')
                 page.locator('#fabricacao_1').fill('2026-09-01')
@@ -179,6 +179,112 @@ with sync_playwright() as p:
             page.close()
         browser.close()
 server.shutdown()
+''', env)
+
+
+    @unittest.skipUnless(os.environ.get('CV_BROWSER_TESTS'), 'Opt-in: requires Playwright browsers')
+    def test_dashboard_and_conference_list_navigation(self):
+        import shutil
+        shutil.copytree(test_production.ROOT / 'static', self.cwd / 'static')
+        env = dict(self.env, PYTHONPATH=os.environ.get('PYTHONPATH', ''),
+                   PLAYWRIGHT_BROWSERS_PATH=os.environ.get('PLAYWRIGHT_BROWSERS_PATH', ''))
+        self.run_code(FIXTURE + '''
+# All records below exist only in the temporary synthetic database.
+with m.app.app_context():
+    nota = NFe(numero='456', nome_emitente='Fornecedor finalizado ' + 'X'*100,
+               cnpj_emitente='1'*14, data_emissao=datetime.now(), data_importacao=datetime.now())
+    db.session.add(nota)
+    db.session.flush()
+    conf = Conferencia(nfe_id=nota.id, usuario_id=1, data_inicio=datetime(2026,9,10,14,30), status='Conferida')
+    db.session.add(conf)
+    db.session.commit()
+import threading
+from werkzeug.serving import make_server
+from playwright.sync_api import sync_playwright, expect
+server = make_server('127.0.0.1', 0, m.app, threaded=True)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+url = 'http://127.0.0.1:' + str(server.server_port)
+with sync_playwright() as p:
+    for engine in [p.chromium, p.webkit]:
+        browser = engine.launch()
+        for width, height in [(390,844),(360,800),(1440,900)]:
+            page = browser.new_page(viewport={'width':width,'height':height}, is_mobile=width<600, has_touch=width<600)
+            errors = []
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto(url+'/login')
+            page.locator('[name=email]').fill('mobile@example.invalid')
+            page.locator('[name=senha]').fill('test-only-password')
+            page.locator('button[type=submit]').click()
+            def no_overflow():
+                assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), (engine.name,width)
+            for label, destination in [('NF-e recebidas','/nfes-recebidas'),('Conferências pendentes','/conferencias')]:
+                page.goto(url+'/dashboard')
+                no_overflow()
+                expect(page.locator('a.stat-card')).to_have_count(2)
+                expect(page.locator('article.stat-card')).to_have_count(2)
+                card = page.locator('a.stat-card').filter(has_text=label)
+                expect(card).to_have_attribute('href', destination)
+                assert card.bounding_box()['height'] >= 44
+                card.focus()
+                expect(card).to_be_focused()
+                page.keyboard.press('Enter')
+                page.wait_for_url(url+destination)
+                page.goto(url+'/dashboard')
+                card = page.locator('a.stat-card').filter(has_text=label)
+                if width < 600:
+                    card.tap(position={'x':8,'y':8})
+                else:
+                    card.click(position={'x':8,'y':8})
+                page.wait_for_url(url+destination)
+            no_overflow()
+            desktop = page.locator('.conference-list-desktop')
+            mobile = page.locator('.conference-list-mobile')
+            if width < 600:
+                expect(desktop).to_be_hidden()
+                expect(mobile).to_be_visible()
+                expect(mobile.locator('article')).to_have_count(2)
+                for number, cid, label, status in [('123',1,'Continuar conferência','Em andamento'),('456',2,'Ver conferência','Conferida')]:
+                    card = mobile.locator('article').filter(has=page.get_by_role('heading', name='NF-e '+number, exact=True))
+                    expect(card.locator('.conference-supplier')).to_be_visible()
+                    expect(card.locator('dl')).to_contain_text('Operador Teste')
+                    expect(card.locator('dl')).to_contain_text('Início')
+                    expect(card.locator('.badge')).to_have_text(status)
+                    action = card.get_by_role('link', name=label, exact=True)
+                    expect(action).to_have_attribute('href', '/conferencias/'+str(cid))
+                    assert action.bounding_box()['height'] >= 44
+                    action.tap()
+                    page.wait_for_url(url+'/conferencias/'+str(cid))
+                    page.goto(url+'/conferencias')
+                page.screenshot(path='/private/tmp/cv-list-'+engine.name+'-'+str(width)+'.png', full_page=True)
+            else:
+                expect(mobile).to_be_hidden()
+                expect(desktop.locator('table')).to_be_visible()
+                expect(desktop.locator('th')).to_have_text(['NF-e','Fornecedor','Responsável','Início','Status','Ação'])
+                for label, cid in [('Continuar',1),('Visualizar',2)]:
+                    action = desktop.get_by_role('link', name=label, exact=True)
+                    expect(action).to_have_attribute('href', '/conferencias/'+str(cid))
+                    action.click()
+                    page.wait_for_url(url+'/conferencias/'+str(cid))
+                    page.goto(url+'/conferencias')
+            for size in [320,360,390,600,601,768,900,1024,1440]:
+                page.set_viewport_size({'width':size,'height':height})
+                no_overflow()
+                expect(mobile).to_be_visible() if size <= 600 else expect(desktop).to_be_visible()
+                expect(desktop).to_be_hidden() if size <= 600 else expect(mobile).to_be_hidden()
+            assert not errors, errors
+            page.close()
+        browser.close()
+server.shutdown()
+# Missing start time and empty lists must also render without errors.
+from types import SimpleNamespace
+from flask import render_template
+with m.app.test_request_context():
+    from flask_login import login_user
+    login_user(db.session.get(Usuario, 1))
+    conf = SimpleNamespace(id=1, nfe=SimpleNamespace(numero='123', nome_emitente='Teste'),
+                           usuario=SimpleNamespace(nome='Operador'), data_inicio=None, status='Em andamento')
+    assert 'Continuar conferência' in render_template('conferencia.html', conferencias=[conf])
+    assert 'Nenhuma conferência iniciada.' in render_template('conferencia.html', conferencias=[])
 ''', env)
 
 

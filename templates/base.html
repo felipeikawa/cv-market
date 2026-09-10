@@ -18,6 +18,7 @@
         <a href="{{ url_for('produtos') }}" class="{{ 'active' if request.endpoint == 'produtos' }}">▤ <span>Produtos</span></a>
         {% if current_user.perfil == 'admin' %}
         <div class="nav-label">Administração</div>
+        <a href="{{ url_for('ocr_teste') }}" class="{{ 'active' if request.endpoint == 'ocr_teste' }}">▧ <span>Teste OCR</span></a>
         <a href="{{ url_for('usuarios') }}" class="{{ 'active' if request.endpoint == 'usuarios' }}">♙ <span>Usuários</span></a>
         <a href="{{ url_for('configuracoes') }}" class="{{ 'active' if request.endpoint == 'configuracoes' }}">⚙ <span>Configurações</span></a>
         {% endif %}
