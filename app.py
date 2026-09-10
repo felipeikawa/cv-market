@@ -374,10 +374,12 @@ def detalhe_nfe(nfe_id):
 def data_formulario(valor, campo):
     if not valor:
         return None
-    try:
-        return datetime.strptime(valor, "%d/%m/%Y").date()
-    except ValueError:
-        raise ValueError(f"A {campo} deve estar no formato DD/MM/AAAA.")
+    for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(valor, formato).date()
+        except ValueError:
+            pass
+    raise ValueError(f"A {campo} deve estar no formato DD/MM/AAAA.")
 
 
 def atualizar_conferencia(conferencia):
@@ -450,14 +452,19 @@ def ver_conferencia(conferencia_id):
 @login_required
 def salvar_conferencia(conferencia_id):
     conferencia = db.get_or_404(Conferencia, conferencia_id)
+    item_atual = request.form.get("item_atual", type=int)
+    if item_atual is not None:
+        item_atual = max(0, min(item_atual, len(conferencia.itens) - 1))
     try:
         atualizar_conferencia(conferencia)
         db.session.commit()
+        if item_atual is not None and request.form.get("navegacao") == "proximo":
+            item_atual = min(item_atual + 1, max(0, len(conferencia.itens) - 1))
         flash("Conferência salva com sucesso.", "success")
     except ValueError as erro:
         db.session.rollback()
         flash(str(erro), "error")
-    return redirect(url_for("ver_conferencia", conferencia_id=conferencia.id))
+    return redirect(url_for("ver_conferencia", conferencia_id=conferencia.id, item=item_atual))
 
 
 @app.route("/conferencias/<int:conferencia_id>/finalizar", methods=["POST"])

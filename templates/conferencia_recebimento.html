@@ -1,6 +1,103 @@
 {% extends 'base.html' %}
 {% block content %}
-<section class="page-heading"><div><h1>Conferência de Recebimento</h1><p>NF-e: {{ conferencia.nfe.numero }} · Fornecedor: {{ conferencia.nfe.nome_emitente }}</p><p>Status: <span class="badge neutral">{{ conferencia.status }}</span></p></div><a class="button secondary" href="{{ url_for('detalhe_nfe', nfe_id=conferencia.nfe.id) }}">Ver NF-e</a></section>
-<section class="panel progress-panel"><div class="panel-heading"><div><h2>Produtos conferidos: {{ conferidos }} de {{ total }}</h2><p>{{ progresso }}% dos produtos conferidos</p></div><strong>{{ progresso }}%</strong></div><div class="progress-track"><span style="width: {{ progresso }}%"></span></div></section>
-<form method="post" action="{{ url_for('salvar_conferencia', conferencia_id=conferencia.id) }}"><section class="panel observation-panel"><label for="observacoes">Observações da conferência</label><textarea id="observacoes" name="observacoes" placeholder="Registre informações gerais do recebimento.">{{ conferencia.observacoes or '' }}</textarea></section><section class="conference-items">{% for item in conferencia.itens %}<article class="panel conference-item"><div class="conference-item-title"><div><h2>{{ item.item_nfe.descricao }}</h2><p>EAN: {{ item.item_nfe.ean or 'Não informado' }}</p></div><span class="badge {{ 'ok' if item.status == 'OK' else ('atencao' if item.status == 'Divergência' else 'pendente') }}">{{ item.status }}</span></div><div class="conference-fields"><div><label>Quantidade esperada</label><strong>{{ item.quantidade_esperada }} {{ item.item_nfe.unidade or '' }}</strong></div><div><label for="quantidade_{{ item.id }}">Quantidade recebida</label><input id="quantidade_{{ item.id }}" name="quantidade_{{ item.id }}" type="number" min="0" step="0.0001" value="{{ item.quantidade_recebida if item.quantidade_recebida is not none else '' }}" {{ 'disabled' if conferencia.status != 'Em andamento' }}></div><div><label for="lote_{{ item.id }}">Lote</label><input id="lote_{{ item.id }}" name="lote_{{ item.id }}" value="{{ item.lote or '' }}" placeholder="Não informado" {{ 'disabled' if conferencia.status != 'Em andamento' }}></div><div><label for="fabricacao_{{ item.id }}">Data de fabricação</label><input id="fabricacao_{{ item.id }}" name="fabricacao_{{ item.id }}" value="{{ item.data_fabricacao.strftime('%d/%m/%Y') if item.data_fabricacao else '' }}" placeholder="DD/MM/AAAA" {{ 'disabled' if conferencia.status != 'Em andamento' }}></div><div><label for="validade_{{ item.id }}">Data de validade</label><input id="validade_{{ item.id }}" name="validade_{{ item.id }}" value="{{ item.data_validade.strftime('%d/%m/%Y') if item.data_validade else '' }}" placeholder="DD/MM/AAAA" {{ 'disabled' if conferencia.status != 'Em andamento' }}></div><div><label for="observacao_{{ item.id }}">Observação do item</label><input id="observacao_{{ item.id }}" name="observacao_{{ item.id }}" value="{{ item.observacao or '' }}" placeholder="Opcional" {{ 'disabled' if conferencia.status != 'Em andamento' }}></div></div></article>{% endfor %}</section>{% if conferencia.status == 'Em andamento' %}<div class="conference-actions"><button class="button secondary" type="submit">Salvar conferência</button><button class="button primary" type="submit" formaction="{{ url_for('finalizar_conferencia', conferencia_id=conferencia.id) }}">Finalizar conferência</button></div>{% endif %}</form>
+<section class="page-heading">
+<div>
+<h1>Conferência de Recebimento</h1>
+<p>NF-e: {{ conferencia.nfe.numero }} · Fornecedor: {{ conferencia.nfe.nome_emitente }}</p>
+<p>Status: <span class="badge neutral">{{ conferencia.status }}</span>
+</p>
+</div>
+<a class="button secondary" href="{{ url_for('detalhe_nfe', nfe_id=conferencia.nfe.id) }}">Ver NF-e</a>
+</section>
+<section class="panel progress-panel">
+<div class="panel-heading">
+<div>
+<h2>Produtos conferidos: {{ conferidos }} de {{ total }}</h2>
+<p>{{ progresso }}% dos produtos conferidos</p>
+</div>
+<strong>{{ progresso }}%</strong>
+</div>
+<div class="progress-track" role="progressbar" aria-label="Produtos conferidos" aria-valuenow="{{ progresso }}" aria-valuemin="0" aria-valuemax="100">
+<span style="width: {{ progresso }}%">
+</span>
+</div>
+</section>
+<form id="conferenceForm" method="post" action="{{ url_for('salvar_conferencia', conferencia_id=conferencia.id) }}">
+<input type="hidden" name="item_atual" id="currentItem" value="{{ request.args.get('item', '0') }}">
+<div class="mobile-conference-nav">
+<p id="itemPosition" tabindex="-1" aria-live="polite">
+</p>
+<button type="button" class="button secondary" id="allItemsButton" aria-expanded="false" aria-controls="allItems">Ver todos os itens</button>
+</div>
+<section id="allItems" class="all-items" aria-label="Todos os itens" hidden>
+
+{% for item in conferencia.itens %}
+
+<button type="button" class="item-summary" data-item-index="{{ loop.index0 }}">
+<span>Item {{ loop.index }} de {{ total }}</span>
+<strong>{{ item.item_nfe.descricao }}</strong>
+<span>Esperada: {{ item.quantidade_esperada }} {{ item.item_nfe.unidade or '' }} · Recebida: <span data-summary-quantity>{{ item.quantidade_recebida if item.quantidade_recebida is not none else '—' }}</span>
+</span>
+<span class="badge {{ 'ok' if item.status == 'OK' else ('atencao' if item.status == 'Divergência' else 'pendente') }}">{{ item.status }}</span>
+<small data-draft hidden>Alterações não salvas</small>
+</button>
+{% else %}<p>Nenhum item nesta conferência.</p>
+{% endfor %}
+
+</section>
+<section class="panel observation-panel">
+<label for="observacoes">Observações da conferência</label>
+<textarea id="observacoes" name="observacoes" placeholder="Registre informações gerais do recebimento.">{{ conferencia.observacoes or '' }}</textarea>
+</section>
+<section class="conference-items">
+{% for item in conferencia.itens %}
+<article class="panel conference-item" data-item-index="{{ loop.index0 }}">
+<div class="conference-item-title">
+<div>
+<h2>{{ item.item_nfe.descricao }}</h2>
+<p>EAN: {{ item.item_nfe.ean or 'Não informado' }}</p>
+</div>
+<span class="badge {{ 'ok' if item.status == 'OK' else ('atencao' if item.status == 'Divergência' else 'pendente') }}">{{ item.status }}</span>
+</div>
+<div class="conference-fields">
+<div>
+<label>Quantidade esperada</label>
+<strong>{{ item.quantidade_esperada }} {{ item.item_nfe.unidade or '' }}</strong>
+</div>
+<div>
+<label for="quantidade_{{ item.id }}">Quantidade recebida</label>
+<input id="quantidade_{{ item.id }}" name="quantidade_{{ item.id }}" type="number" inputmode="decimal" min="0" step="0.0001" value="{{ item.quantidade_recebida if item.quantidade_recebida is not none else '' }}" {{ 'disabled' if conferencia.status != 'Em andamento' }}>
+</div>
+<div class="traceability-placeholder">
+<button type="button" class="button secondary camera-placeholder" disabled>Ler lote e validade <small>Em breve</small>
+</button>
+</div>
+<div>
+<label for="lote_{{ item.id }}">Lote</label>
+<input id="lote_{{ item.id }}" name="lote_{{ item.id }}" value="{{ item.lote or '' }}" placeholder="Não informado" {{ 'disabled' if conferencia.status != 'Em andamento' }}>
+</div>
+<div>
+<label for="fabricacao_{{ item.id }}">Data de fabricação</label>
+<input id="fabricacao_{{ item.id }}" name="fabricacao_{{ item.id }}" type="date" value="{{ item.data_fabricacao.isoformat() if item.data_fabricacao else '' }}" {{ 'disabled' if conferencia.status != 'Em andamento' }}>
+</div>
+<div>
+<label for="validade_{{ item.id }}">Data de validade</label>
+<input id="validade_{{ item.id }}" name="validade_{{ item.id }}" type="date" value="{{ item.data_validade.isoformat() if item.data_validade else '' }}" {{ 'disabled' if conferencia.status != 'Em andamento' }}>
+</div>
+<div>
+<label for="observacao_{{ item.id }}">Observação do item</label>
+<input id="observacao_{{ item.id }}" name="observacao_{{ item.id }}" value="{{ item.observacao or '' }}" placeholder="Opcional" {{ 'disabled' if conferencia.status != 'Em andamento' }}>
+</div>
+</div>
+</article>
+{% endfor %}
+</section>
+<div class="mobile-conference-actions">
+<button type="button" class="button secondary" id="previousItem">Anterior</button>
+{% if conferencia.status == 'Em andamento' %}<button type="submit" class="button primary" name="navegacao" value="proximo" id="saveNext">Salvar e próximo</button>{% else %}<button type="button" class="button primary" id="nextItem">Próximo</button>{% endif %}
+</div>
+{% if conferencia.status == 'Em andamento' %}<div class="conference-actions">
+<button class="button secondary" type="submit">Salvar conferência</button>
+<button class="button primary" type="submit" formaction="{{ url_for('finalizar_conferencia', conferencia_id=conferencia.id) }}">Finalizar conferência</button>
+</div>{% endif %}</form>
 {% endblock %}

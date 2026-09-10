@@ -10,7 +10,7 @@
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
       <a class="brand" href="{{ url_for('dashboard') }}"><span class="brand-mark">C&V</span><span>MARKET</span></a>
-      <nav>
+      <nav aria-label="Navegação principal">
         <a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint == 'dashboard' }}">▦ <span>Dashboard</span></a>
         <a href="{{ url_for('nfes_recebidas') }}" class="{{ 'active' if request.endpoint in ['nfes_recebidas', 'detalhe_nfe'] }}">▤ <span>NF-e Recebidas</span></a>
         <a href="{{ url_for('importar') }}" class="{{ 'active' if request.endpoint == 'importar' }}">↑ <span>Importar NF-e</span></a>
@@ -23,8 +23,9 @@
         {% endif %}
       </nav>
     </aside>
+    <button type="button" class="menu-backdrop" id="menuBackdrop" aria-label="Fechar menu" hidden></button>
     <div class="page-area">
-      <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Abrir menu">☰</button><div><strong>{{ titulo }}</strong><small>Controle de recebimento de mercadorias</small></div><div class="profile"><span class="avatar">{{ current_user.nome[0] }}</span><span>{{ current_user.nome }}</span><a href="{{ url_for('sair') }}">Sair</a></div></header>
+      <header class="topbar"><button class="menu-button" id="menuButton" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="sidebar">☰</button><div><strong>{{ titulo }}</strong><small>Controle de recebimento de mercadorias</small></div><div class="profile"><span class="avatar">{{ current_user.nome[0] }}</span><span>{{ current_user.nome }}</span><a href="{{ url_for('sair') }}">Sair</a></div></header>
       <main class="content">
         {% with messages = get_flashed_messages(with_categories=true) %}{% for categoria, mensagem in messages %}<div class="alert {{ categoria }}">{{ mensagem }}</div>{% endfor %}{% endwith %}
         {% block content %}{% endblock %}
