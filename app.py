@@ -616,6 +616,95 @@ def usuarios():
     )
 
 
+def _ultimo_admin_ativo(usuario, novo_perfil=None, novo_ativo=None):
+    """Return whether saving these values would remove the last active admin."""
+    perfil = usuario.perfil if novo_perfil is None else novo_perfil
+    ativo = usuario.ativo if novo_ativo is None else novo_ativo
+    if usuario.perfil != "admin" or not usuario.ativo:
+        return False
+    if perfil == "admin" and ativo:
+        return False
+    return Usuario.query.filter_by(perfil="admin", ativo=True).count() <= 1
+
+
+def _possui_historico(usuario):
+    return bool(usuario.nfes_importadas or usuario.conferencias)
+
+
+@app.route("/usuarios/<int:usuario_id>/editar", methods=["GET", "POST"])
+@login_required
+@somente_admin
+def editar_usuario(usuario_id):
+    usuario = db.get_or_404(Usuario, usuario_id)
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        perfil = request.form.get("perfil", "")
+        ativo = request.form.get("ativo") == "on"
+        nova_senha = request.form.get("senha", "")
+        formulario = {"nome": nome, "email": email, "perfil": perfil, "ativo": ativo}
+        erro = None
+        if not nome or not email or perfil not in ("admin", "operador"):
+            erro = "Preencha nome, e-mail e perfil válidos."
+        elif "@" not in email:
+            erro = "Informe um e-mail válido."
+        elif Usuario.query.filter(Usuario.email == email, Usuario.id != usuario.id).first():
+            erro = "Já existe um usuário cadastrado com este e-mail."
+        elif nova_senha and len(nova_senha) < 8:
+            erro = "A senha deve ter pelo menos 8 caracteres."
+        elif usuario.id == current_user.id and not ativo:
+            erro = "Você não pode desativar sua própria conta."
+        elif _ultimo_admin_ativo(usuario, perfil, ativo):
+            erro = "Não é possível remover ou desativar o último administrador ativo."
+        if erro:
+            flash(erro, "error")
+            return render_template("usuarios.html", titulo="Editar usuário", usuarios=Usuario.query.order_by(Usuario.nome).all(),
+                                   novo=False, editar=usuario, formulario=formulario)
+        usuario.nome, usuario.email, usuario.perfil, usuario.ativo = nome, email, perfil, ativo
+        if nova_senha:
+            usuario.definir_senha(nova_senha)
+        db.session.commit()
+        flash("Usuário atualizado com sucesso.", "success")
+        return redirect(url_for("usuarios"))
+    formulario = {"nome": usuario.nome, "email": usuario.email, "perfil": usuario.perfil, "ativo": usuario.ativo}
+    return render_template("usuarios.html", titulo="Editar usuário", usuarios=Usuario.query.order_by(Usuario.nome).all(),
+                           novo=False, editar=usuario, formulario=formulario)
+
+
+@app.post("/usuarios/<int:usuario_id>/alternar-status")
+@login_required
+@somente_admin
+def alternar_status_usuario(usuario_id):
+    usuario = db.get_or_404(Usuario, usuario_id)
+    if usuario.id == current_user.id and usuario.ativo:
+        flash("Você não pode desativar sua própria conta.", "error")
+    elif usuario.ativo and _ultimo_admin_ativo(usuario, novo_ativo=False):
+        flash("Não é possível desativar o último administrador ativo.", "error")
+    else:
+        usuario.ativo = not usuario.ativo
+        db.session.commit()
+        flash("Usuário desativado com sucesso." if not usuario.ativo else "Usuário reativado com sucesso.", "success")
+    return redirect(url_for("usuarios"))
+
+
+@app.post("/usuarios/<int:usuario_id>/excluir")
+@login_required
+@somente_admin
+def excluir_usuario(usuario_id):
+    usuario = db.get_or_404(Usuario, usuario_id)
+    if usuario.id == current_user.id:
+        flash("Você não pode excluir sua própria conta.", "error")
+    elif usuario.perfil == "admin" and usuario.ativo and Usuario.query.filter_by(perfil="admin", ativo=True).count() <= 1:
+        flash("Não é possível excluir o último administrador ativo.", "error")
+    elif _possui_historico(usuario):
+        flash("Este usuário possui histórico no sistema. Desative-o em vez de excluí-lo.", "error")
+    else:
+        db.session.delete(usuario)
+        db.session.commit()
+        flash("Usuário excluído com sucesso.", "success")
+    return redirect(url_for("usuarios"))
+
+
 @app.route("/configuracoes")
 @login_required
 @somente_admin
